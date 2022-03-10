@@ -23,12 +23,12 @@ export { getCurrentRunningApp } from './common';
  *
  * 这么设计的目的是为了保证每个子应用切换回来之后，还能运行在应用 bootstrap 之后的环境下。
  *
- * @param appName
- * @param elementGetter
- * @param scopedCSS
- * @param useLooseSandbox
- * @param excludeAssetFilter
- * @param globalContext
+ * @param appName 子应用名称
+ * @param elementGetter  子应用根元素获取器
+ * @param scopedCSS 样式隔离
+ * @param useLooseSandbox 是否使用 loose 沙箱
+ * @param excludeAssetFilter 资源过滤器
+ * @param globalContext 全局上下文
  */
 export function createSandboxContainer(
   appName: string,
@@ -39,7 +39,7 @@ export function createSandboxContainer(
   globalContext?: typeof window,
 ) {
   let sandbox: SandBox;
-  if (window.Proxy) {
+  if (window.Proxy) { // 如果支持 Proxy，使用 Proxy 沙箱
     sandbox = useLooseSandbox ? new LegacySandbox(appName, globalContext) : new ProxySandbox(appName, globalContext);
   } else {
     sandbox = new SnapshotSandbox(appName);
@@ -70,6 +70,7 @@ export function createSandboxContainer(
       const sideEffectsRebuildersAtMounting = sideEffectsRebuilders.slice(bootstrappingFreers.length);
 
       // must rebuild the side effects which added at bootstrapping firstly to recovery to nature state
+      // 为什么？
       if (sideEffectsRebuildersAtBootstrapping.length) {
         sideEffectsRebuildersAtBootstrapping.forEach((rebuild) => rebuild());
       }

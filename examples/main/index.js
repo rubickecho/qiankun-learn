@@ -42,6 +42,9 @@ registerMicroApps(
       container: '#subapp-viewport',
       loader,
       activeRule: '/vue',
+      props: {
+        test: 'hello'
+      }
     },
     // {
     //   name: 'angular9',
@@ -67,8 +70,9 @@ registerMicroApps(
   ],
   {
     beforeLoad: [
-      app => {
+      (app, globalContext) => {
         console.log('[LifeCycle] before load %c%s', 'color: green;', app.name);
+        console.log('[LifeCycle] before load globalContext %c, %o', 'color: green;', globalContext);
       },
     ],
     beforeMount: [
@@ -105,7 +109,11 @@ setDefaultMountApp('/vue');
 /**
  * Step4 启动应用
  */
-start();
+start({
+  sandbox: {
+    experimentalStyleIsolation: true
+  }
+});
 
 runAfterFirstMounted(() => {
   console.log('[MainApp] first app mounted');

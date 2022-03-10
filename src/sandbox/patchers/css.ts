@@ -40,15 +40,26 @@ export class ScopedCSS {
     this.sheet.disabled = true;
   }
 
+  // 处理css
   process(styleNode: HTMLStyleElement, prefix: string = '') {
+    // 获取 css 样式内容
     if (styleNode.textContent !== '') {
+      // 创建一个新的文本节点。这个方法可以用来转义 HTML 字符。
       const textNode = document.createTextNode(styleNode.textContent || '');
+
+      // 临时保存样式的 style 节点
       this.swapNode.appendChild(textNode);
+
+      // 获取样式表
       const sheet = this.swapNode.sheet as any; // type is missing
+
+      // 获取所有样式集合
       const rules = arrayify<CSSRule>(sheet?.cssRules ?? []);
+
+      // 遍历重写 css，添加前缀
       const css = this.rewrite(rules, prefix);
       // eslint-disable-next-line no-param-reassign
-      styleNode.textContent = css;
+      styleNode.textContent = css; // 设置回样式表中
 
       // cleanup
       this.swapNode.removeChild(textNode);
@@ -200,6 +211,9 @@ export const process = (
 
   const tag = (mountDOM.tagName || '').toLowerCase();
 
+  /**
+   * 例如 div[data-qiankun="vue"] h1[data-v-469af010] {}
+   */
   if (tag && stylesheetElement.tagName === 'STYLE') {
     const prefix = `${tag}[${QiankunCSSRewriteAttr}="${appName}"]`;
     processor.process(stylesheetElement, prefix);

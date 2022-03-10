@@ -42,11 +42,19 @@ const autoDowngradeForLowVersionBrowser = (configuration: FrameworkConfiguration
   return configuration;
 };
 
+// 注册微应用api
+/**
+ *
+ * @param apps 微应用数组
+ * @param lifeCycles 用户自定义的生命周期
+ */
 export function registerMicroApps<T extends ObjectType>(
   apps: Array<RegistrableApp<T>>,
   lifeCycles?: FrameworkLifeCycles<T>,
 ) {
   // Each app only needs to be registered once
+  // 过滤出未注册的微应用
+  // Array.prototype.some()，方法测试数组中是不是至少有1个元素通过了被提供的函数测试，返回一个布尔值
   const unregisteredApps = apps.filter((app) => !microApps.some((registeredApp) => registeredApp.name === app.name));
 
   microApps = [...microApps, ...unregisteredApps];
@@ -54,12 +62,14 @@ export function registerMicroApps<T extends ObjectType>(
   unregisteredApps.forEach((app) => {
     const { name, activeRule, loader = noop, props, ...appConfig } = app;
 
+    // single-sap 应用注册
     registerApplication({
       name,
       app: async () => {
         loader(true);
-        await frameworkStartedDefer.promise;
+        await frameworkStartedDefer.promise; // ???
 
+        // 重要，组装加载微应用配置项
         const { mount, ...otherMicroAppConfigs } = (
           await loadApp({ name, props, ...appConfig }, frameworkConfiguration, lifeCycles)
         )();
@@ -69,7 +79,14 @@ export function registerMicroApps<T extends ObjectType>(
           ...otherMicroAppConfigs,
         };
       },
+      /**
+       * 可以是一个路径前缀，它将匹配每个以该路径开头的URL，也可以是激活函数(如简单参数中所述)或一个数组两者都包含在内。
+       * 如果任何条件为真，则保留应用活动。路径前缀也接受动态值(以':'开头)，因为有些路径会接收url参数，但仍然应该激活您的应用。
+       */
       activeWhen: activeRule,
+      /**
+       * 在生命周期钩子函数执行时会被作为参数传入
+       */
       customProps: props,
     });
   });

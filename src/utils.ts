@@ -198,6 +198,7 @@ export function isEnableScopedCSS(sandbox: FrameworkConfiguration['sandbox']) {
     return false;
   }
 
+  // experimentalStyleIsolation: true 所有样式强制加上前缀
   return !!sandbox.experimentalStyleIsolation;
 }
 

@@ -70,10 +70,15 @@ function createElement(
   scopedCSS: boolean,
   appInstanceId: string,
 ): HTMLElement {
+  // 创建一个 div 节点，将 appContent 插入到这个节点中
   const containerElement = document.createElement('div');
   containerElement.innerHTML = appContent;
   // appContent always wrapped with a singular div
+  // so we can get the first child as the app element
   const appElement = containerElement.firstChild as HTMLElement;
+
+  // 如果强制样式隔离，则将 appElement 插入到一个 shadow dom 中
+  // 相关参考资料: https://developer.mozilla.org/zh-CN/docs/Web/API/Element/shadowRoot
   if (strictStyleIsolation) {
     if (!supportShadowDOM) {
       console.warn(
@@ -94,13 +99,18 @@ function createElement(
     }
   }
 
+  // 如果样式隔离
   if (scopedCSS) {
+    // 获取 data-qiankun 属性的节点
     const attr = appElement.getAttribute(css.QiankunCSSRewriteAttr);
-    if (!attr) {
+    if (!attr) { // 如果没有则设置
       appElement.setAttribute(css.QiankunCSSRewriteAttr, appInstanceId);
     }
 
+    // 过去该节点下所有 css style
     const styleNodes = appElement.querySelectorAll('style') || [];
+
+    // 循环遍历添加前缀
     forEach(styleNodes, (stylesheetElement: HTMLStyleElement) => {
       css.process(appElement!, stylesheetElement, appInstanceId);
     });
@@ -168,7 +178,7 @@ function getRender(appInstanceId: string, appContent: string, legacyRender?: HTM
 
     // The container might have be removed after micro app unmounted.
     // Such as the micro app unmount lifecycle called by a react componentWillUnmount lifecycle, after micro app unmounted, the react component might also be removed
-    if (phase !== 'unmounted') {
+    if (phase !== 'unmounted') { // 应用加载状态
       const errorMsg = (() => {
         switch (phase) {
           case 'loading':
@@ -187,11 +197,14 @@ function getRender(appInstanceId: string, appContent: string, legacyRender?: HTM
 
     if (containerElement && !containerElement.contains(element)) {
       // clear the container
-      while (containerElement!.firstChild) {
+      while (containerElement!.firstChild) { // 从容器中移除
         rawRemoveChild.call(containerElement, containerElement!.firstChild);
       }
 
       // append the element to container if it exist
+      // 将 element 插入到 containerElement 中，即创建好的 element 到 通过 container 找到的容器中
+
+      // 例如 <div id="subapp-viewport"><div id="__qiankun_microapp_wrapper_for_vue__" data-name="vue" data-version="2.6.3" data-qiankun="vue">......</div>
       if (element) {
         rawAppendChild.call(containerElement, element);
       }
@@ -241,13 +254,21 @@ let prevAppUnmountedDeferred: Deferred<void>;
 
 export type ParcelConfigObjectGetter = (remountContainer?: string | HTMLElement) => ParcelConfigObject;
 
+/**
+ *
+ * @param app 加载的 APP 对象
+ * @param configuration 加载的 APP 配置
+ * @param lifeCycles 加载的 APP 生命周期，用户自定义的生命周期
+ * @returns
+ */
 export async function loadApp<T extends ObjectType>(
   app: LoadableApp<T>,
   configuration: FrameworkConfiguration = {},
   lifeCycles?: FrameworkLifeCycles<T>,
 ): Promise<ParcelConfigObjectGetter> {
+  //  entry: '//localhost:7101' 微应用的入口
   const { entry, name: appName } = app;
-  const appInstanceId = genAppInstanceIdByName(appName);
+  const appInstanceId = genAppInstanceIdByName(appName); // 获取微应用实例
 
   const markName = `[qiankun] App ${appInstanceId} Loading`;
   if (process.env.NODE_ENV === 'development') {
@@ -255,14 +276,16 @@ export async function loadApp<T extends ObjectType>(
   }
 
   const {
-    singular = false,
-    sandbox = true,
-    excludeAssetFilter,
+    singular = false, // 是否单实例场景
+    sandbox = true, // 是否沙箱隔离
+    excludeAssetFilter, // 可选，指定部分特殊的动态加载的微应用资源（css/js) 不被 qiankun 劫持处理。
     globalContext = window,
-    ...importEntryOpts
-  } = configuration;
+    ...importEntryOpts // ??? 走哪里来？
+  } = configuration; // 基本配置参数
 
   // get the entry html content and script executor
+  // html entry，需要再研究 import-html-entry 包
+  // 返回模板，执行脚本，和资源路径
   const { template, execScripts, assetPublicPath } = await importEntry(entry, importEntryOpts);
 
   // as single-spa load and bootstrap new app parallel with other apps unmounting
@@ -272,8 +295,11 @@ export async function loadApp<T extends ObjectType>(
     await (prevAppUnmountedDeferred && prevAppUnmountedDeferred.promise);
   }
 
+  // 获取应用容器，例如: <div id="__qiankun_microapp_wrapper_for_vue__" data-name="vue" data-version="2.6.3">
   const appContent = getDefaultTplWrapper(appInstanceId)(template);
 
+  // 当配置为 { strictStyleIsolation: true } 时表示开启严格的样式隔离模式。
+  // 这种模式下 qiankun 会为每个微应用的容器包裹上一个 shadow dom 节点，从而确保微应用的样式不会对全局造成影响
   const strictStyleIsolation = typeof sandbox === 'object' && !!sandbox.strictStyleIsolation;
 
   if (process.env.NODE_ENV === 'development' && strictStyleIsolation) {
@@ -282,23 +308,29 @@ export async function loadApp<T extends ObjectType>(
     );
   }
 
+  // 是否启用隔离 CSS
   const scopedCSS = isEnableScopedCSS(sandbox);
+
+  // 创建应用容器节点
   let initialAppWrapperElement: HTMLElement | null = createElement(
     appContent,
-    strictStyleIsolation,
-    scopedCSS,
-    appInstanceId,
+    strictStyleIsolation, // 是否强制隔离
+    scopedCSS, // 是否隔离样式
+    appInstanceId, // 应用实例ID
   );
 
+  // container - string | HTMLElement - 必选，微应用的容器节点的选择器或者 Element 实例。
+  // 如container: '#root' 或 container: document.querySelector('#root')。
   const initialContainer = 'container' in app ? app.container : undefined;
   const legacyRender = 'render' in app ? app.render : undefined;
 
   const render = getRender(appInstanceId, appContent, legacyRender);
 
   // 第一次加载设置应用可见区域 dom 结构
-  // 确保每次应用加载前容器 dom 结构已经设置完毕
+  // 确保每次应用加载前容器 dom 结构已经设置完毕，首次为加载状态
   render({ element: initialAppWrapperElement, loading: true, container: initialContainer }, 'loading');
 
+  // 获取 app 包装器
   const initialAppWrapperGetter = getAppWrapperGetter(
     appInstanceId,
     !!legacyRender,
@@ -307,27 +339,31 @@ export async function loadApp<T extends ObjectType>(
     () => initialAppWrapperElement,
   );
 
+  // windows 全局对象
   let global = globalContext;
   let mountSandbox = () => Promise.resolve();
   let unmountSandbox = () => Promise.resolve();
   const useLooseSandbox = typeof sandbox === 'object' && !!sandbox.loose;
-  let sandboxContainer;
-  if (sandbox) {
+  let sandboxContainer; //  沙盒容器
+  if (sandbox) { // 如果有沙盒对象
+
+    // 创建沙盒容器
     sandboxContainer = createSandboxContainer(
-      appInstanceId,
+      appInstanceId, // 应用实例ID
       // FIXME should use a strict sandbox logic while remount, see https://github.com/umijs/qiankun/issues/518
       initialAppWrapperGetter,
       scopedCSS,
       useLooseSandbox,
       excludeAssetFilter,
-      global,
+      global, // 全局对象
     );
     // 用沙箱的代理对象作为接下来使用的全局对象
-    global = sandboxContainer.instance.proxy as typeof window;
-    mountSandbox = sandboxContainer.mount;
-    unmountSandbox = sandboxContainer.unmount;
+    global = sandboxContainer.instance.proxy as typeof window; // 代理时，有这句：this.proxy = proxy，所以在 instance 上可以获取到 proxy 对象
+    mountSandbox = sandboxContainer.mount; // 启动沙箱方法
+    unmountSandbox = sandboxContainer.unmount; // 关闭沙箱方法
   }
 
+  // 合并用户 registerMicroApp 时自定义的生命周期勾子
   const {
     beforeUnmount = [],
     afterUnmount = [],
@@ -336,9 +372,12 @@ export async function loadApp<T extends ObjectType>(
     beforeLoad = [],
   } = mergeWith({}, getAddOns(global, assetPublicPath), lifeCycles, (v1, v2) => concat(v1 ?? [], v2 ?? []));
 
+  // 执行 beforeLoad 勾子，并返回 app, global 数据
   await execHooksChain(toArray(beforeLoad), app, global);
 
   // get the lifecycle hooks from module exports
+  // 从加载的脚本中获取生命周期钩子
+  // ??? 如何实现的？有什么作用?
   const scriptExports: any = await execScripts(global, sandbox && !useLooseSandbox);
   const { bootstrap, mount, unmount, update } = getLifecyclesFromExports(
     scriptExports,
@@ -347,6 +386,8 @@ export async function loadApp<T extends ObjectType>(
     sandboxContainer?.instance?.latestSetProp,
   );
 
+
+  // 初始化qiankun 全局数据通信对象
   const { onGlobalStateChange, setGlobalState, offGlobalStateChange }: Record<string, CallableFunction> =
     getMicroAppStateActions(appInstanceId);
 
@@ -357,6 +398,8 @@ export async function loadApp<T extends ObjectType>(
     let appWrapperElement: HTMLElement | null;
     let appWrapperGetter: ReturnType<typeof getAppWrapperGetter>;
 
+    // 包装应用挂载参数，用于 single-spa 挂载应用
+    // single-spa docs: https://zh-hans.single-spa.js.org/docs/parcels-api/#mountparcel
     const parcelConfig: ParcelConfigObject = {
       name: appInstanceId,
       bootstrap,
@@ -371,7 +414,7 @@ export async function loadApp<T extends ObjectType>(
           }
         },
         async () => {
-          if ((await validateSingularMode(singular, app)) && prevAppUnmountedDeferred) {
+          if ((await validateSingularMode(singular, app)) && prevAppUnmountedDeferred) { // 验证是否时单应用实例模式
             return prevAppUnmountedDeferred.promise;
           }
 
@@ -400,16 +443,16 @@ export async function loadApp<T extends ObjectType>(
 
           render({ element: appWrapperElement, loading: true, container: remountContainer }, 'mounting');
         },
-        mountSandbox,
+        mountSandbox, // 启动沙箱
         // exec the chain after rendering to keep the behavior with beforeLoad
-        async () => execHooksChain(toArray(beforeMount), app, global),
+        async () => execHooksChain(toArray(beforeMount), app, global), // 准备开始加载 执行 beforeMount 勾子
         async (props) => mount({ ...props, container: appWrapperGetter(), setGlobalState, onGlobalStateChange }),
         // finish loading after app mounted
         async () => render({ element: appWrapperElement, loading: false, container: remountContainer }, 'mounted'),
-        async () => execHooksChain(toArray(afterMount), app, global),
+        async () => execHooksChain(toArray(afterMount), app, global), // 已经加载完，触发 afterMount 勾子
         // initialize the unmount defer after app mounted and resolve the defer after it unmounted
         async () => {
-          if (await validateSingularMode(singular, app)) {
+          if (await validateSingularMode(singular, app)) { // 验证是否时单应用实例模式
             prevAppUnmountedDeferred = new Deferred<void>();
           }
         },
@@ -421,19 +464,19 @@ export async function loadApp<T extends ObjectType>(
         },
       ],
       unmount: [
-        async () => execHooksChain(toArray(beforeUnmount), app, global),
+        async () => execHooksChain(toArray(beforeUnmount), app, global), // 准备开始卸载 执行 beforeUnmount 勾子
         async (props) => unmount({ ...props, container: appWrapperGetter() }),
-        unmountSandbox,
-        async () => execHooksChain(toArray(afterUnmount), app, global),
+        unmountSandbox, // 关闭沙箱
+        async () => execHooksChain(toArray(afterUnmount), app, global), // 关闭后触发 afterUnmount 勾子
         async () => {
-          render({ element: null, loading: false, container: remountContainer }, 'unmounted');
+          render({ element: null, loading: false, container: remountContainer }, 'unmounted'); // 渲染卸载完成  将节点从 dom 中移除
           offGlobalStateChange(appInstanceId);
           // for gc
           appWrapperElement = null;
           syncAppWrapperElement2Sandbox(appWrapperElement);
         },
         async () => {
-          if ((await validateSingularMode(singular, app)) && prevAppUnmountedDeferred) {
+          if ((await validateSingularMode(singular, app)) && prevAppUnmountedDeferred) { // 验证是否时单实例应用
             prevAppUnmountedDeferred.resolve();
           }
         },
