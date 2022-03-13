@@ -220,12 +220,13 @@ export function start(opts: FrameworkConfiguration = {}) {
     ...importEntryOpts
   } = frameworkConfiguration;
 
-  if (prefetch) {
+  if (prefetch) { // 是否预加载资源
     doPrefetchStrategy(microApps, prefetch, importEntryOpts);
   }
 
   frameworkConfiguration = autoDowngradeForLowVersionBrowser(frameworkConfiguration);
 
+  // 启动应用
   startSingleSpa({ urlRerouteOnly });
   started = true;
 

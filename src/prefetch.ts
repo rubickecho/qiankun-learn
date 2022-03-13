@@ -40,6 +40,7 @@ const isSlowNetwork = navigator.connection
 
 /**
  * prefetch assets, do nothing while in mobile network
+  * 预加载资源，不在移动端执行
  * @param entry
  * @param opts
  */
@@ -50,24 +51,45 @@ function prefetch(entry: Entry, opts?: ImportEntryOpts): void {
   }
 
   requestIdleCallback(async () => {
+    // 将获取到的 js脚本和 css脚本预加载
+    /**
+     * return getEmbedHTML(template, styles, { fetch }).then(embedHTML => ({
+				template: embedHTML,
+				assetPublicPath,
+				getExternalScripts: () => getExternalScripts(scripts, fetch),
+				getExternalStyleSheets: () => getExternalStyleSheets(styles, fetch),
+				execScripts: (proxy, strictGlobal, execScriptsHooks = {}) => {
+					if (!scripts.length) {
+						return Promise.resolve();
+					}
+					return execScripts(entry, scripts, proxy, {
+						fetch,
+						strictGlobal,
+						beforeExec: execScriptsHooks.beforeExec,
+						afterExec: execScriptsHooks.afterExec,
+					});
+				},
+			}));
+     */
     const { getExternalScripts, getExternalStyleSheets } = await importEntry(entry, opts);
-    requestIdleCallback(getExternalStyleSheets);
-    requestIdleCallback(getExternalScripts);
+    requestIdleCallback(getExternalStyleSheets); // 异步加载脚本
+    requestIdleCallback(getExternalScripts); // 异步加载资源
   });
 }
 
 function prefetchAfterFirstMounted(apps: AppMetadata[], opts?: ImportEntryOpts): void {
+  // 监听 single-spa:first-mount 钩子，首次加载时
   window.addEventListener('single-spa:first-mount', function listener() {
-    const notLoadedApps = apps.filter((app) => getAppStatus(app.name) === NOT_LOADED);
+    const notLoadedApps = apps.filter((app) => getAppStatus(app.name) === NOT_LOADED); // 获取还没有加载过的 apps
 
     if (process.env.NODE_ENV === 'development') {
       const mountedApps = getMountedApps();
       console.log(`[qiankun] prefetch starting after ${mountedApps} mounted...`, notLoadedApps);
     }
 
-    notLoadedApps.forEach(({ entry }) => prefetch(entry, opts));
+    notLoadedApps.forEach(({ entry }) => prefetch(entry, opts)); // 预先加载资源
 
-    window.removeEventListener('single-spa:first-mount', listener);
+    window.removeEventListener('single-spa:first-mount', listener); // 移除监听
   });
 }
 
@@ -82,13 +104,15 @@ export function prefetchImmediately(apps: AppMetadata[], opts?: ImportEntryOpts)
 export function doPrefetchStrategy(
   apps: AppMetadata[],
   prefetchStrategy: PrefetchStrategy,
-  importEntryOpts?: ImportEntryOpts,
+  importEntryOpts?: ImportEntryOpts, // 参数
 ) {
   const appsName2Apps = (names: string[]): AppMetadata[] => apps.filter((app) => names.includes(app.name));
 
+  // 如果是数组
+  // example: ['app-1', 'app-2']
   if (Array.isArray(prefetchStrategy)) {
     prefetchAfterFirstMounted(appsName2Apps(prefetchStrategy as string[]), importEntryOpts);
-  } else if (isFunction(prefetchStrategy)) {
+  } else if (isFunction(prefetchStrategy)) { // 如果上方法，则执行，获取返回参数，并处理
     (async () => {
       // critical rendering apps would be prefetch as earlier as possible
       const { criticalAppNames = [], minorAppsName = [] } = await prefetchStrategy(apps);
@@ -97,11 +121,11 @@ export function doPrefetchStrategy(
     })();
   } else {
     switch (prefetchStrategy) {
-      case true:
+      case true: // 如果是布尔值 ture
         prefetchAfterFirstMounted(apps, importEntryOpts);
         break;
 
-      case 'all':
+      case 'all': // 如果是全部应用预先加载
         prefetchImmediately(apps, importEntryOpts);
         break;
 
