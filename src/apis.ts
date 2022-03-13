@@ -69,7 +69,7 @@ export function registerMicroApps<T extends ObjectType>(
         loader(true);
         await frameworkStartedDefer.promise; // ???
 
-        // 重要，组装加载微应用配置项
+        // !!! 重要，组装加载微应用配置项
         const { mount, ...otherMicroAppConfigs } = (
           await loadApp({ name, props, ...appConfig }, frameworkConfiguration, lifeCycles)
         )();
@@ -95,6 +95,13 @@ export function registerMicroApps<T extends ObjectType>(
 const appConfigPromiseGetterMap = new Map<string, Promise<ParcelConfigObjectGetter>>();
 const containerMicroAppsMap = new Map<string, MicroApp[]>();
 
+/**
+ * 手动加载应用
+ * @param app
+ * @param configuration
+ * @param lifeCycles
+ * @returns
+ */
 export function loadMicroApp<T extends ObjectType>(
   app: LoadableApp<T>,
   configuration?: FrameworkConfiguration & { autoStart?: boolean },
@@ -227,6 +234,12 @@ export function start(opts: FrameworkConfiguration = {}) {
   frameworkConfiguration = autoDowngradeForLowVersionBrowser(frameworkConfiguration);
 
   // 启动应用
+  // https://zh-hans.single-spa.js.org/docs/api#start
+  /**
+   * urlRerouteOnly: 默认为 false 的布尔值。
+   * 如果设置为 true，除非客户端路由已更改，否则调用history.pushState()并history.replaceState()不会触发单个 spa 重新路由。
+   * 在某些情况下，将此设置为 true 可能会更好地提高性能。有关更多信息，请阅读文档
+   */
   startSingleSpa({ urlRerouteOnly });
   started = true;
 

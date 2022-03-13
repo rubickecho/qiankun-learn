@@ -87,6 +87,7 @@ function prefetchAfterFirstMounted(apps: AppMetadata[], opts?: ImportEntryOpts):
       console.log(`[qiankun] prefetch starting after ${mountedApps} mounted...`, notLoadedApps);
     }
 
+    // 核心方法，prefetch 预加载
     notLoadedApps.forEach(({ entry }) => prefetch(entry, opts)); // 预先加载资源
 
     window.removeEventListener('single-spa:first-mount', listener); // 移除监听

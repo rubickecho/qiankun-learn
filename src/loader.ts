@@ -285,7 +285,7 @@ export async function loadApp<T extends ObjectType>(
 
   // get the entry html content and script executor
   // html entry，需要再研究 import-html-entry 包
-  // 返回模板，执行脚本，和资源路径
+  // 返回模板，立即执行脚本，和资源路径
   const { template, execScripts, assetPublicPath } = await importEntry(entry, importEntryOpts);
 
   // as single-spa load and bootstrap new app parallel with other apps unmounting
@@ -357,7 +357,7 @@ export async function loadApp<T extends ObjectType>(
       excludeAssetFilter,
       global, // 全局对象
     );
-    // 用沙箱的代理对象作为接下来使用的全局对象
+    // !!!重要，用沙箱的代理对象作为接下来使用的全局对象
     global = sandboxContainer.instance.proxy as typeof window; // 代理时，有这句：this.proxy = proxy，所以在 instance 上可以获取到 proxy 对象
     mountSandbox = sandboxContainer.mount; // 启动沙箱方法
     unmountSandbox = sandboxContainer.unmount; // 关闭沙箱方法
@@ -377,7 +377,7 @@ export async function loadApp<T extends ObjectType>(
 
   // get the lifecycle hooks from module exports
   // 从加载的脚本中获取生命周期钩子
-  // ??? 如何实现的？有什么作用?
+  // 用新的沙箱上下文执行脚本，并返回脚本的返回值
   const scriptExports: any = await execScripts(global, sandbox && !useLooseSandbox);
   const { bootstrap, mount, unmount, update } = getLifecyclesFromExports(
     scriptExports,
@@ -446,6 +446,7 @@ export async function loadApp<T extends ObjectType>(
         mountSandbox, // 启动沙箱
         // exec the chain after rendering to keep the behavior with beforeLoad
         async () => execHooksChain(toArray(beforeMount), app, global), // 准备开始加载 执行 beforeMount 勾子
+        // 应用加载成功，返回应用实例，包含 GlobalState，子应用可以在 mount 生命周期中获取到，并执行相应的处理逻辑
         async (props) => mount({ ...props, container: appWrapperGetter(), setGlobalState, onGlobalStateChange }),
         // finish loading after app mounted
         async () => render({ element: appWrapperElement, loading: false, container: remountContainer }, 'mounted'),

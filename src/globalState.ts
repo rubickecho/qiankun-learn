@@ -19,6 +19,11 @@ function emitGlobal(state: Record<string, any>, prevState: Record<string, any>) 
   });
 }
 
+/**
+ * 初始化全局状态
+ * @param state
+ * @returns
+ */
 export function initGlobalState(state: Record<string, any> = {}) {
   if (process.env.NODE_ENV === 'development') {
     console.warn(`[qiankun] globalState tools will be removed in 3.0, pls don't use it!`);
