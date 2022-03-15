@@ -6,7 +6,7 @@
 import { concat, mergeWith } from 'lodash';
 import type { FrameworkLifeCycles, ObjectType } from '../interfaces';
 
-import getRuntimePublicPathAddOn from './runtimePublicPath';
+import getRuntimePublicPathAddOn from './runtimePublicPath'; // 获取运行时 public path
 import getEngineFlagAddon from './engineFlag';
 
 export default function getAddOns<T extends ObjectType>(global: Window, publicPath: string): FrameworkLifeCycles<T> {

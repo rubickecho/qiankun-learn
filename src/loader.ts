@@ -363,7 +363,9 @@ export async function loadApp<T extends ObjectType>(
     unmountSandbox = sandboxContainer.unmount; // 关闭沙箱方法
   }
 
-  // 合并用户 registerMicroApp 时自定义的生命周期勾子
+  // 合并用户 registerMicroApp 时自定义的生命周期勾子 和 内部默认定义的勾子
+  // 定义全局上下文绑定值 __INJECTED_PUBLIC_PATH_BY_QIANKUN__ 即运行时的 assets public path
+  // https://webpack.docschina.org/guides/public-path/#on-the-fly
   const {
     beforeUnmount = [],
     afterUnmount = [],
